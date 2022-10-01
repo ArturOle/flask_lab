@@ -6,5 +6,7 @@
 /templates
 /static
 /flask_session
+/.vscode
+/config
 
 lab3.py

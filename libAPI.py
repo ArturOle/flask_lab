@@ -1,12 +1,10 @@
 import json
 import logging
-from pyclbr import Function
 from flask import Flask, render_template, redirect, session
 from flask import request
 from flask_session import Session
 from datetime import timedelta
 import sqlite3
-import functools
 
 
 class Error(Exception):
@@ -30,7 +28,7 @@ class LibraryAPI(Flask):
         Loader(self.database)
 
     @property
-    def database(self, config: str = r"C:\Users\artur\OneDrive\Desktop\PPL_lab3\flask_lab\config\configuration.json"):
+    def database(self, config: str = r"config\configuration.json"):
         if not self._database:
             with open(config, "r") as f:
                 data = json.load(f)
@@ -45,8 +43,6 @@ class LibraryAPI(Flask):
 
 
 class Loader:
-    db_name = ""
-
     def __init__(self, db_name):
         self.db_name = db_name
         self.commands = {
@@ -65,61 +61,56 @@ class Loader:
             exit(1)
         return con
 
-    @staticmethod
-    def connection(function: Function = None, *, database_name: str = None):
-        if not database_name:
+    def extract(self, command: str, id: int = None):
+        if not self.db_name:
             raise MissingDataBaseNameError
 
-        def _wrap(function):
+        if id:
+            return self._extract_with_id(command, id)
+        return self._extract(command)
 
-            @functools.wraps(function)
-            def wrapped(*args, **kwargs):
-                con = Loader.connect(database_name)
-                cur = con.cursor()
-                wrap_result = function(cur, *args, **kwargs)
-                con.close()
-                return wrap_result
+    def _extract_with_id(self, command, id):
+        with self.connect(self.db_name) as con:
+            cur = con.cursor()
+            cur.execute(command.format(id))
+            return cur.fetchall()
 
-        if function:
-            _wrap(function)
+    def _extract(self, command):
+        with self.connect(self.db_name) as con:
+            cur = con.cursor()
+            cur.execute(command)
+            return cur.fetchall()
 
-        return _wrap
-
-    @connection(database_name=db_name)
-    def load(self, cursor: sqlite3.Cursor, command: str, id: int = None):
+    def load(self, command: str, id: int = None):
         command = self.commands[command]
         if not id:
-            cursor.execute(command)
-            result = cursor.fetchall()
-        else:
-            cursor.execute(command.format(id))
-            result = cursor.fetchall()
-        return result
+            return self.extract(command)
+        return self.extract(command, id)
 
-    # function for loading books from database
-    def load_books(self):
-        con = sqlite3.connect(self.database)
-        cur = con.cursor()
-        cur.execute("SELECT * FROM books")
-        books = cur.fetchall()
-        con.close()
-        return books
+    # # function for loading books from database
+    # def load_books(self):
+    #     con = sqlite3.connect(self.database)
+    #     cur = con.cursor()
+    #     cur.execute("SELECT * FROM books")
+    #     books = cur.fetchall()
+    #     con.close()
+    #     return books
 
-    def load_people(self):
-        con = sqlite3.connect(self.database)
-        cur = con.cursor()
-        cur.execute("SELECT userid, username FROM users")
-        users = cur.fetchall()
-        con.close()
-        return users
+    # def load_people(self):
+    #     con = sqlite3.connect(self.database)
+    #     cur = con.cursor()
+    #     cur.execute("SELECT userid, username FROM users")
+    #     users = cur.fetchall()
+    #     con.close()
+    #     return users
 
-    def load_person(self, id: int):
-        con = sqlite3.connect(self.database)
-        cur = con.cursor()
-        cur.execute("SELECT * FROM users WHERE userid = " + str(id))
-        user = cur.fetchall()
-        con.close()
-        return user
+    # def load_person(self, id: int):
+    #     con = sqlite3.connect(self.database)
+    #     cur = con.cursor()
+    #     cur.execute("SELECT * FROM users WHERE userid = " + str(id))
+    #     user = cur.fetchall()
+    #     con.close()
+    #     return user
 
 
 app = LibraryAPI()

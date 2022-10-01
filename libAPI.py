@@ -1,14 +1,29 @@
-from pyclbr import Function
-from __init__ import *
+import json
+from flask import Flask, render_template, redirect, session
+from flask import request
+from flask_session import Session
+from datetime import timedelta
+import sqlite3
+
+app = Flask('Flask Lab')
 
 # #creating Session class instance for handling sessions
 # sesClass = Session()
 
-class LibraryAPI:
-    DATABASE = 'database.db'
+class LibraryAPI(Flask):
     ADMIN = False
+    _database = None
     _session = None
 
+    def __init__(self, name: str="Flask'a'lab"):
+        super().__init__(name)
+
+    @property
+    def database(self, config: str="config\configuration.json"):
+        if not self._database:
+            self._database = json.load(config)["database"]
+        return self._database
+    
     @property
     def session(self):
         if not self._session:

@@ -1,0 +1,7 @@
+*.zip
+*.db
+*.pdf
+/venv
+/templates
+/static
+/flask_session

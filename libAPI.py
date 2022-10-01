@@ -1,14 +1,15 @@
 import json
+import logging
+from pyclbr import Function
 from flask import Flask, render_template, redirect, session
 from flask import request
 from flask_session import Session
 # from datetime import timedelta
 import sqlite3
 
-app = Flask('Flask Lab')
 
-# #creating Session class instance for handling sessions
-# sesClass = Session()
+class MissingDataBaseNameError(Exception):
+    """Error occured while making connection: Missing Database name"""
 
 
 class LibraryAPI(Flask):
@@ -23,7 +24,7 @@ class LibraryAPI(Flask):
         Loader(self.database)
 
     @property
-    def database(self, config: str = "config\configuration.json"):
+    def database(self, config: str = "config\\configuration.json"):
         if not self._database:
             self._database = json.load(config)["database"]
         return self._database
@@ -41,28 +42,43 @@ class Loader:
         "people": "SELECT userid, username FROM users",
         "person": "SELECT * FROM users WHERE userid={}"
     }
-    db_name = "database.db"
+    db_name = ""
 
     def __init__(self, db_name):
         self.db_name = db_name
 
-#     @staticmethod
-#     def connection(function: Function, db_name: str):
-#         con = sqlite3.connect(db_name)
-#         cur = con.cursor()
-#         def command():
-#             return function(cur)
-#         con.close()
-#         return command()
-#     @connection(db_name)
-#     def load(cursor: sqlite3.Cursor, command: str, id: int=None):
-#         if id==None:
-#             cursor.execute(command)
-#             books = cursor.fetchall()
-#         else:
-#             cursor.execute(command.format(id))
-#             books = cursor.fetchall()
-#         return books
+    @staticmethod
+    def connect(db_name):
+        try:
+            con = sqlite3.connect(db_name)
+        except sqlite3.Error:
+            logging.error("Error occured while tring to connect to the \"{}\" database".format(db_name))
+            exit(1)
+        return con
+
+    @staticmethod
+    def connection(function: Function, db_name: str):
+        if not db_name:
+            raise MissingDataBaseNameError
+
+        def wrapped(cur: sqlite3.Cursor, command: str, id: int = None):
+            con = Loader.connect(db_name)
+            cur = con.cursor()
+            wrap_result = function(cur, command, id)
+            con.close()
+            return wrap_result
+
+        return wrapped
+
+    @connection(db_name)
+    def load(cursor: sqlite3.Cursor, command: str, id: int = None):
+        if not id:
+            cursor.execute(command)
+            books = cursor.fetchall()
+        else:
+            cursor.execute(command.format(id))
+            books = cursor.fetchall()
+        return books
 
     # function for loading books from database
     def load_books(self):

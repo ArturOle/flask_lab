@@ -18,14 +18,17 @@ class MissingDataBaseNameError(Exception):
 class LibraryAPI(Flask):
     _database = None
     _session = None
+    _loader = None
 
     def __init__(self, name: str = "Flask'a'lab"):
         super().__init__(name)
         self.admin = False
 
-    def run(self, debug: bool = False):
-        super().run(debug=debug)
-        Loader(self.database)
+    @property
+    def loader(self):
+        if not self._loader:
+            self._loader = Loader(self.database)
+        return self._loader
 
     @property
     def database(self, config: str = r"config\configuration.json"):
@@ -40,6 +43,9 @@ class LibraryAPI(Flask):
         if not self._session:
             self._session = Session()
         return self._session
+
+    def load(self, command: str, id: int = None):
+        return self.loader.load(command, id)
 
 
 class Loader:
@@ -113,7 +119,7 @@ class Loader:
     #     return user
 
 
-app = LibraryAPI()
+app = LibraryAPI('')
 
 
 # function that handles get requests to / directory
@@ -148,7 +154,7 @@ def indexPost():
                 )
                 con.commit()
                 con.close()
-                books = app.load_books()
+                books = app.load()
                 redirect("/")
                 return render_template(
                     'index.html',
@@ -157,7 +163,7 @@ def indexPost():
                     admin=app.admin
                 )
             else:
-                books = app.load_books()
+                books = app.load()
                 redirect("/")
                 return render_template(
                     'index.html',
@@ -166,7 +172,7 @@ def indexPost():
                     admin=app.admin
                 )
         else:
-            books = app.load_books()
+            books = app.load()
             redirect("/")
             return render_template(
                 'index.html',
@@ -204,6 +210,7 @@ def loginPost():
             return render_template('login.html', message="incorrect login")
         else:
             session['user'] = response_form["login"]
+            print(user)
             app.admin = user[0][3]
             return redirect('/')
     else:

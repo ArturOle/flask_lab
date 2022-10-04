@@ -44,8 +44,48 @@ class LibraryAPI(Flask):
             self._session = Session()
         return self._session
 
-    def load(self, command: str, id: int = None):
-        return self.loader.load(command, id)
+    def load(self, command: str, *args):
+        return self.loader.load(command, *args)
+
+    def insert(self, command: str, *args):
+        return self.loader.insert(command, *args)
+
+    def prepare_request(
+            self,
+            command: str,
+            template: str,
+            message: str = None,
+            redirect: bool = False,
+            path: str = '/',
+            **kwargs
+            ):
+
+        result = self.load(command)
+
+        if redirect:
+            redirect(path)
+
+        return render_template(
+            template,
+            books=result,
+            message=message,
+            admin=app.admin,
+            **kwargs
+        )
+
+    def prepare_index(
+            self,
+            message: str = '',
+            redirect: bool = False,
+            path: str = '/'
+            ):
+        return self.prepare_request(
+            command="books",
+            template="index.html",
+            message=message,
+            redirect=redirect,
+            path=path
+        )
 
 
 class Loader:
@@ -54,7 +94,17 @@ class Loader:
         self.commands = {
             "books": "SELECT * FROM books",
             "people": "SELECT userid, username FROM users",
-            "person": "SELECT * FROM users WHERE userid={}"
+            "person": "SELECT * FROM users WHERE userid={}",
+            "books_with_author_and_title":
+                "SELECT * FROM books where author = '{}' and title = '{}' LIMIT 1",
+            "check_if_book_in_db":
+                "INSERT INTO books (author,title) VALUES ('{}','{}')",
+            "user_login":
+                "SELECT * FROM users where username='{}' and password='{}' LIMIT 1",
+            "get_user":
+                "SELECT * FROM users where username = '{}' LIMIT 1",
+            "add_user":
+                "INSERT INTO users (username, password, admin) VALUES ('{}','{}','{}')"
         }
 
     @staticmethod
@@ -63,60 +113,53 @@ class Loader:
             con = sqlite3.connect(db_name)
         except sqlite3.Error:
             logging.error(
-                Error.info.format(' '.join(["Error occured for:", db_name])))
+                Error.info.format(' '.join(["Error occured for:", db_name]))
+            )
             exit(1)
         return con
 
-    def extract(self, command: str, id: int = None):
+    def insert(self, command: str, *args):
+        if self.commands.get(command, None):
+            command = self.commands[command]
+            if not args:
+                return self.run_command(command, insert=True)
+            return self.run_command(command, *args, insert=True)
+        else:
+            raise AttributeError("Command needs to match the allowed list")
+
+    def load(self, command: str, *args):
+        if self.commands.get(command, None):
+            command = self.commands[command]
+            if not args:
+                return self.run_command(command)
+            return self.run_command(command, *args)
+        else:
+            raise AttributeError("Command needs to match the allowed list")
+
+    def run_command(self, command: str, *args, insert: bool = False):
         if not self.db_name:
             raise MissingDataBaseNameError
 
-        if id:
-            return self._extract_with_id(command, id)
-        return self._extract(command)
+        if args:
+            return self._execute_with_params(command, *args, insert)
+        return self._execute(command, insert)
 
-    def _extract_with_id(self, command, id):
+    def _execute_with_params(self, command, *args, insert: bool = False):
         with self.connect(self.db_name) as con:
             cur = con.cursor()
-            cur.execute(command.format(id))
+            print(command.format(*args))
+            cur.execute(command.format(*args))
+            if insert:
+                return con.commit()
             return cur.fetchall()
 
-    def _extract(self, command):
+    def _execute(self, command, insert: bool = False):
         with self.connect(self.db_name) as con:
             cur = con.cursor()
             cur.execute(command)
+            if insert:
+                return con.commit()
             return cur.fetchall()
-
-    def load(self, command: str, id: int = None):
-        command = self.commands[command]
-        if not id:
-            return self.extract(command)
-        return self.extract(command, id)
-
-    # # function for loading books from database
-    # def load_books(self):
-    #     con = sqlite3.connect(self.database)
-    #     cur = con.cursor()
-    #     cur.execute("SELECT * FROM books")
-    #     books = cur.fetchall()
-    #     con.close()
-    #     return books
-
-    # def load_people(self):
-    #     con = sqlite3.connect(self.database)
-    #     cur = con.cursor()
-    #     cur.execute("SELECT userid, username FROM users")
-    #     users = cur.fetchall()
-    #     con.close()
-    #     return users
-
-    # def load_person(self, id: int):
-    #     con = sqlite3.connect(self.database)
-    #     cur = con.cursor()
-    #     cur.execute("SELECT * FROM users WHERE userid = " + str(id))
-    #     user = cur.fetchall()
-    #     con.close()
-    #     return user
 
 
 app = LibraryAPI('')
@@ -124,7 +167,7 @@ app = LibraryAPI('')
 
 # function that handles get requests to / directory
 @app.route('/', methods=['GET', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'CONNECT'])
-def indexGet():
+def index_get():
     if 'user' in session:
         books = app.load("books")
         return render_template('index.html', books=books, admin=app.admin)
@@ -134,51 +177,32 @@ def indexGet():
 
 # function that handles post requests to / directory
 @app.route('/', methods=['POST'])
-def indexPost():
+def index_post():
     if 'user' in session:
-        response_form = request.form
-        if response_form["author"] != "" and response_form["title"] != "":
-
-            con = sqlite3.connect(app.database)
-            # Fetch data from table
-            cur = con.cursor()
-            cur.execute(
-                "SELECT * FROM books where author = ? and title = ? LIMIT 1",
-                (response_form['author'], response_form['title'])
+        response_author = request.form["author"]
+        response_from_title = request.form["title"]
+        if response_author and response_from_title:
+            books = app.load(
+                "books_with_author_and_title",
+                response_author,
+                response_from_title
             )
-            books = cur.fetchall()
             if books == []:
-                cur.execute(
-                    "INSERT INTO books (author,title) VALUES (?,?)",
-                    (response_form["author"], response_form["title"])
+                app.insert(
+                    "check_if_book_in_db",
+                    response_author,
+                    response_from_title
                 )
-                con.commit()
-                con.close()
-                books = app.load()
-                redirect("/")
-                return render_template(
-                    'index.html',
-                    books=books,
-                    message="book added",
-                    admin=app.admin
+                return app.prepare_index(
+                    message="book added"
                 )
             else:
-                books = app.load()
-                redirect("/")
-                return render_template(
-                    'index.html',
-                    books=books,
-                    message="book already in the database!",
-                    admin=app.admin
+                return app.prepare_index(
+                    message="book already in the database"
                 )
         else:
-            books = app.load()
-            redirect("/")
-            return render_template(
-                'index.html',
-                books=books,
-                message="author and title cannot be empty!",
-                admin=app.admin
+            return app.prepare_index(
+                message="author and title cannot be empty!"
             )
     else:
         return redirect("/login")
@@ -186,7 +210,7 @@ def indexPost():
 
 # function that handles get requests to /login directory
 @app.route('/login', methods=['GET', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'CONNECT'])
-def loginGet():
+def login_get():
     if 'user' not in session:
         return render_template('login.html')
     else:
@@ -195,45 +219,42 @@ def loginGet():
 
 # function that handles post requests to /login directory
 @app.route('/login', methods=['POST'])
-def loginPost():
+def login_post():
     if 'user' not in session:
-        response_form = request.form
-        print(response_form)
-        con = sqlite3.connect(app.database)
-        cur = con.cursor()
-        cur.execute(
-            "SELECT * FROM users where username=? and password=? LIMIT 1",
-            (response_form['login'], response_form['password'])
+        response = request.form
+        user = app.load(
+            "user_login",
+            response['login'],
+            response['password']
         )
-        user = cur.fetchall()
         if user == []:
             return render_template('login.html', message="incorrect login")
         else:
-            session['user'] = response_form["login"]
-            print(user)
+            session['user'] = response["login"]
             app.admin = user[0][3]
             return redirect('/')
     else:
         return redirect("/")
 
+
 # function for handling database (uncomment and use localhost:5000/dbcreate to create a usable database)
-# @app.route('/dbcreate')
-# def dbcreate():
-#     # Db connection
-#     conn = sqlite3.connect(database)
-#     cur = conn.cursor()
-#     # Create tables with sqlite3
-#     conn.execute('CREATE TABLE users (userid INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, password TEXT, admin BOOL)')
-#     conn.execute('CREATE TABLE books (author TEXT, title TEXT)')
-#     cur.execute('INSERT INTO books (author,title) VALUES (\"Christopher Paolini\", \"Eragon\")')
-#     conn.commit()
-#     cur.execute('INSERT INTO users (username, password, admin) VALUES (\"admin\", \"admin\", True)')
-#     conn.commit()
-#     cur.execute('INSERT INTO users (username, password, admin) VALUES (\"user\", \"user\", False)')
-#     conn.commit()
-#     # Terminate the db connection#
-#     conn.close()
-#     return indexGet()
+@app.route('/dbcreate')
+def create_db():
+    # Db connection
+    conn = sqlite3.connect(app.database)
+    cur = conn.cursor()
+    # Create tables with sqlite3
+    conn.execute('CREATE TABLE users (userid INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, password TEXT, admin BOOL)')
+    conn.execute('CREATE TABLE books (author TEXT, title TEXT)')
+    cur.execute('INSERT INTO books (author,title) VALUES (\"Christopher Paolini\", \"Eragon\")')
+    conn.commit()
+    cur.execute('INSERT INTO users (username, password, admin) VALUES (\"admin\", \"admin\", True)')
+    conn.commit()
+    cur.execute('INSERT INTO users (username, password, admin) VALUES (\"user\", \"user\", False)')
+    conn.commit()
+    # Terminate the db connection#
+    conn.close()
+    return index_get()
 
 
 # function that handles logout
@@ -256,11 +277,7 @@ def users():
         if app.admin == 1:
             users = app.load("people")
             return render_template('users.html', users=users)
-        else:
-            return redirect('/')
-    else:
-        # Redirect the client to the homepage
-        return redirect('/')
+    return redirect('/')
 
 
 # function that handles post requests to /users
@@ -268,39 +285,43 @@ def users():
 def user_add():
     if 'user' in session:
         if app.admin == 1:
-            response_form = request.form
-            if response_form["login"] != "" and response_form["password"] != "":
-                con = sqlite3.connect(app.database)
-                # Fetch data from table
-                cur = con.cursor()
-                print(response_form)
-                cur.execute(
-                    "SELECT * FROM users where username = \"" +str(response_form["login"]) + "\" LIMIT 1")
-                users = cur.fetchall()
-                if users == []:
+            response = request.form
+            if response["login"] and response["password"]:
+                user = app.load("get_user", response["login"])
+                if user == []:
                     try:
-                        adm = True if response_form["admin"] == 'on' else False
+                        adm = True if response["admin"] == 'true' else False
                     except KeyError:
                         adm = False
-                    cur.execute("INSERT INTO users (username, password, admin) VALUES (?,?,?)",
-                    (response_form["login"],response_form["password"], adm))
-                    con.commit()
-                    con.close()
+                    app.insert(
+                        "add_user",
+                        response["login"],
+                        response["password"],
+                        adm
+                    )
                     users = app.load("people")
-                    return render_template('users.html', message="user added", users=users)
+                    return render_template(
+                        'users.html',
+                        message="user added",
+                        users=users
+                    )
                 else:
-                    users = app.load("people")
-                    redirect("/users")
-                    return render_template('users.html', message="such user already exists!", users=users)
+                    return app.prepare_request(
+                        "people",
+                        "users.html",
+                        path="/users",
+                        message="such user already exists!",
+                        users=users
+                    )
             else:
-                users = app.load("people")
-                redirect("/users")
-                return render_template('users.html', message="login and password cannot be empty!", users=users)       
-        else:
-            return redirect('/')
-    else:
-        # Redirect the client to the homepage
-        return redirect('/')
+                return app.prepare_request(
+                    "people",
+                    "users.html",
+                    path="/users",
+                    message="such user already exists!",
+                    users=users
+                )
+    return redirect('/')
 
 
 # function that handles get requests to /users/<id>
@@ -310,11 +331,7 @@ def user(id):
         if app.admin == 1:
             user = app.load("person", id)
             return render_template('user.html', user=user)
-        else:
-            return redirect('/')
-    else:
-        # Redirect the client to the homepage
-        return redirect('/')
+    return redirect('/')
 
 
 # #on lab3.py startup

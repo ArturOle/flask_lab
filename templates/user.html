@@ -1,0 +1,84 @@
+<html>
+
+<head>
+    <title>Users list</title>
+    <link rel="stylesheet" type= "text/css" href="{{ url_for('static',filename='styles/styles.css') }}">
+</head>
+
+<body class="user">
+    <canvas id="canvas1">
+        <script>
+            const balls = [];
+            const numBalls = 300;
+            const colors = ["#636363", "#b5b5b5", "#e0e0e0", "#cfc8b2", "#999999"];
+
+            for (let i = 0; i < numBalls; i++) {
+                let ball = document.createElement("div");  
+                ball.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                ball.style.left = `${Math.floor(Math.random() * 100)}vw`;
+                ball.style.top = `${Math.floor(Math.random() * 100)}vh`;
+                ball.style.transform = `scale(${Math.random()})`;
+                ball.style.width = `${Math.random()}em`;
+                ball.style.height = ball.style.width;  
+                ball.style.position = 'absolute';
+                ball.style.borderRadius = "100%";
+                ball.style.opacity = 0.5;
+                ball.style.zIndex = -100;
+                balls.push(ball);
+                document.body.append(ball);
+            }
+
+            balls.forEach((el, index) => {
+                let pos = { 
+                    x: Math.random() * (index % 2 === 0 ? -2 : 2),
+                    y: Math.random()
+                };
+                
+                let animation = el.animate(
+                    [
+                        { transform: "translate(0, 0)" },
+                        { transform: `translate(${pos.x}rem, ${pos.y}rem)` }
+                    ],
+                    {
+                        duration: (Math.random() + 1) * 2500,
+                        direction: "alternate",
+                        iterations: Infinity,
+                        easing: "ease-in-out",
+                        fill: "both"   
+                    }
+                );
+            });
+
+        </script>
+    </canvas>
+    <a class= "links" href="/logout" >Logout</a>
+    <a class= "links" href="/" >Bookshelf</a>
+    <a class= "links" href="/users"> Users</a>
+    <div class="user">
+        <h1>
+            User
+        </h1>
+        <table>
+            <thead>
+            <td class="head">User id</td>
+            <td class="head">Login</td>
+            <td class="head">Password</td>
+            <td class="head">Admin</td>
+            </thead>
+            <tr>
+                <td class="column">{{user[0][0]}}</td>
+                <td class="column">{{user[0][1]}}</td>
+                <td class="column">{{user[0][2]}}</td>
+                <td class="column">{{user[0][3]}}</td>
+            </tr>
+            <tr>
+                <td class="bottom-line"></td>
+                <td class="bottom-line"></td>
+                <td class="bottom-line"></td>
+                <td class="bottom-line"></td>
+            </tr>
+        </table>
+    </div>
+</body>
+
+</html>

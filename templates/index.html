@@ -1,0 +1,93 @@
+<html>
+
+<head>
+    <title>Bookshelf</title>
+    <link rel="stylesheet" type= "text/css" href="{{ url_for('static',filename='styles/styles.css') }}">
+</head>
+
+<body class="index">
+    <canvas id="canvas1">
+        <script>
+            const balls = [];
+            const numBalls = 300;
+            const colors = ["#636363", "#b5b5b5", "#e0e0e0", "#cfc8b2", "#999999"];
+
+            for (let i = 0; i < numBalls; i++) {
+                let ball = document.createElement("div");  
+                ball.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                ball.style.left = `${Math.floor(Math.random() * 100)}vw`;
+                ball.style.top = `${Math.floor(Math.random() * 100)}vh`;
+                ball.style.transform = `scale(${Math.random()})`;
+                ball.style.width = `${Math.random()}em`;
+                ball.style.height = ball.style.width;  
+                ball.style.position = 'absolute';
+                ball.style.borderRadius = "100%";
+                ball.style.opacity = 0.5;
+                ball.style.zIndex = -100;
+                balls.push(ball);
+                document.body.append(ball);
+            }
+
+            balls.forEach((el, index) => {
+                let pos = { 
+                    x: Math.random() * (index % 2 === 0 ? -2 : 2),
+                    y: Math.random()
+                };
+                
+                let animation = el.animate(
+                    [
+                        { transform: "translate(0, 0)" },
+                        { transform: `translate(${pos.x}rem, ${pos.y}rem)` }
+                    ],
+                    {
+                        duration: (Math.random() + 1) * 2500,
+                        direction: "alternate",
+                        iterations: Infinity,
+                        easing: "ease-in-out",
+                        fill: "both"   
+                    }
+                );
+            });
+
+        </script>
+    </canvas>
+    <a class= "links" href="/logout" >Logout</a>
+    {% if admin == 1 %}
+    <a class= "links" href="/users" >Users</a>
+    {% endif %}
+    <div class="add-book">
+        <h1>
+            Add book
+        </h1>
+        <form method=post action="/">
+            Author: <input type=text name=author>
+            Title: <input type=text name=title>
+            <input type=submit>
+        </form>
+        {{message}}
+    </div>
+    <div class="books-list">
+        <h1>
+            Books
+        </h1>
+        <table>
+            <thead>
+            <td class="head">Author</td>
+            <td class="head">Title</td>
+            </thead>
+            
+            {% for book in books %}
+            <tr>
+                <td class="column">{{book[0]}}</td>
+                <td class="column">{{book[1]}}</td>
+            </tr>
+            {% endfor %}
+            <tr>
+                <td class="bottom-line"></td>
+                <td class="bottom-line"></td>
+            </tr>
+        </table>
+    </div>
+</body>
+
+</html>

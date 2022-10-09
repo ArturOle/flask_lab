@@ -1,8 +1,8 @@
-#canvas1 {
+.canvas1 {
     position: absolute;
     z-index: -100;
-    top: 1;
-    left: 1;
+    top: 0;
+    left: 0;
 }
 
 table {
@@ -59,36 +59,41 @@ div.add-book {
 }
 
 body.loginpage{
+    position: fixed;
     background-color: rgb(0, 0, 0);
     color: rgb(199, 199, 199);
-    /* background-repeat: no-repeat;
-    background-size: cover; */
+    min-width: 100%;
+    min-height: 100%;
 }
 
 body.logout{
+    position: fixed;
     background-color: rgb(0, 0, 0);
     color: rgb(199, 199, 199);
-    background-repeat: no-repeat;
-    background-size: cover;
+    min-width: 100%;
+    min-height: 100%;
 }
 
 div.add-user {
+    position: fixed;
     margin-left: 25%;
     margin-right: 25%;
 }
 
 body.users{
+    position: fixed;
     background-color: rgb(0, 0, 0);
     color: rgb(199, 199, 199);
-    background-repeat: no-repeat;
-    background-size: cover;
+    min-width: 100%;
+    min-height: 100%;
 }
 
 body.user{
+    position: fixed;
     background-color: rgb(0, 0, 0);
     color: rgb(199, 199, 199);
-    background-repeat: no-repeat;
-    background-size: cover;
+    min-width: 100%;
+    min-height: 100%;
 }
 
 div.user{
